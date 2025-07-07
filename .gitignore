@@ -1,0 +1,5 @@
+/.env
+/pre-commit
+/requirements.txt
+/.idea
+/.venv

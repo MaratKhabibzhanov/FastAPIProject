@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from src.schemas import User
 
+
 app = FastAPI()
 
 
@@ -15,7 +16,7 @@ def read_custom_message():
     return {"message": "This is a custom message!"}
 
 
-@app.get("/users")
-def read_first_user():
-    first_user = User(id=1, name="John Doe")
-    return first_user
+@app.post("/user")
+def is_adult_user(user: User):
+    is_adult = user.age > 17
+    return {"name": user.name, "age": user.age, "is_adult": is_adult}
