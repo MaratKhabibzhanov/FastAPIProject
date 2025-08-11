@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+from passlib.handlers.bcrypt import bcrypt
+
+from src.schemas import UserInDB
 
 
 sample_product_1 = {"product_id": 123, "name": "Smartphone", "category": "Electronics", "price": 599.99}
@@ -14,13 +16,7 @@ sample_product_5 = {"product_id": 202, "name": "Smartwatch", "category": "Electr
 sample_products = [sample_product_1, sample_product_2, sample_product_3, sample_product_4, sample_product_5]
 
 
-class Credentials(BaseModel):
-    username: str
-    password: str
-
-
-admin_user = Credentials(username="admin", password="q")
-
+# admin_user = User(username="admin", password="q")
+# Симуляция базы данных в виде списка объектов пользователей
+fake_users_db = [UserInDB(username="user1", hashed_password=bcrypt.hash("pass1"))]
 cookie_cache = dict()
-
-MINIMUM_APP_VERSION = "0.0.2"

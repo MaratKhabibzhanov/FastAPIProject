@@ -1,32 +1,46 @@
 from datetime import datetime, timedelta
 from typing import Annotated
-from uuid import uuid4
 
-from fastapi import FastAPI, Header, Request, Response
+from fastapi import Depends, Header, Request, Response
+from fastapi.security import OAuth2PasswordRequestForm
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
-from src.models.models import Credentials, admin_user, cookie_cache
-from src.schemas import CommonHeaders
+from src.models.models import cookie_cache
+from src.schemas import CommonHeaders, User
 
+from .app import app
 from .config import load_config as config
+from .security import create_jwt_token, get_user_from_token
+from .utils import authenticate_user, create_new_user, get_user_from_db
 
-
-app = FastAPI()
-
-feedbacks = list()
 
 token_serializer = URLSafeTimedSerializer(secret_key=config().secret_key)
 
 
 @app.post("/login")
-def login(user: Credentials, response: Response):
-    if user == admin_user:
-        user_id = str(uuid4())
-        cookie_cache[user_id] = dict(user=user, timestamp=datetime.now())
-        confirmation_token = token_serializer.dumps(user_id)
-        response.set_cookie(key="session_token", value=confirmation_token, max_age=300, httponly=True)
-        return {"message": "Cookie has been set!"}
-    return {"message": "Invalid credentials!"}
+def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = User(username=form_data.username, password=form_data.password)
+    authenticated_user = authenticate_user(user)
+    token = create_jwt_token({"sub": authenticated_user.username})
+    return {"access_token": token, "token_type": "bearer"}
+
+
+@app.post("/register")
+def register(user: User):
+    create_new_user(user)
+    return {"message": f"Welcome, {user.username}!"}
+
+
+@app.get("/protected_resource")
+def protected_resource(current_user: str = Depends(get_user_from_token)):
+    """
+    Этот маршрут защищен и требует токен. Если токен действителен, мы возвращаем информацию о пользователе.
+    """
+    user = get_user_from_db(current_user)
+    if user:
+        return {"username": user.username}
+    # Если пользователь не найден, возвращаем ошибку
+    return {"error": "User not found"}
 
 
 @app.get("/profile")

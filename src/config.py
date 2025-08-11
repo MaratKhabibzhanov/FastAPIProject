@@ -13,6 +13,7 @@ class Config:
     db: DatabaseConfig
     secret_key: str
     debug: bool
+    MINIMUM_APP_VERSION: str = "0.0.2"
 
 
 def load_config(path: str = None) -> Config:

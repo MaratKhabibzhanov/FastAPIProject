@@ -3,7 +3,22 @@ from typing import Annotated, Optional
 from fastapi import HTTPException, Query
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from src.models.models import MINIMUM_APP_VERSION
+from .config import load_config
+
+
+MINIMUM_APP_VERSION = load_config().MINIMUM_APP_VERSION
+
+
+class UserBase(BaseModel):
+    username: str
+
+
+class User(UserBase):
+    password: str
+
+
+class UserInDB(UserBase):
+    hashed_password: str
 
 
 class UserCreate(BaseModel):
