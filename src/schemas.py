@@ -21,6 +21,10 @@ class UserInDB(UserBase):
     hashed_password: str
 
 
+class Refresh(BaseModel):
+    refresh_token: str
+
+
 class UserCreate(BaseModel):
     name: str
     email: EmailStr

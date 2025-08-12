@@ -1,26 +1,34 @@
 import datetime
-from typing import Dict
+from typing import Dict, Tuple
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
-
-SECRET_KEY = "090f461de41e4d7fd03be814a953a1438c305ab952a8a45c36f0f348527d1db5"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 15
+from .config import load_config as config
+from .exceptions import ExpireTokenException, InvalidTokenException
+from .models.models import refresh_tokens
 
 
-def create_jwt_token(data: Dict):
+conf = config()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login", refreshUrl="refresh")
+
+
+def create_jwt_tokens(data: Dict) -> Tuple[str, str]:
     """
     Функция для создания JWT токена. Мы копируем входные данные, добавляем время истечения и кодируем токен.
     """
-    to_encode = data.copy()
-    expire = datetime.datetime.now() + datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    to_access = data.copy()
+    to_refresh = data.copy()
+    expire_access = datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=conf.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    to_access.update({"exp": expire_access, "type": "access"})
+    expire_refresh = datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=conf.REFRESH_TOKEN_EXPIRE_MINUTES)
+    to_refresh.update({"exp": expire_refresh, "type": "refresh"})
+    access_token = jwt.encode(to_access, conf.SECRET_KEY, algorithm=conf.ALGORITHM)
+    refresh_token = jwt.encode(to_refresh, conf.SECRET_KEY, algorithm=conf.ALGORITHM)
+    refresh_tokens[data["sub"]] = refresh_token
+    return access_token, refresh_token
 
 
 # Функция для получения пользователя из токена
@@ -29,13 +37,24 @@ def get_user_from_token(token: str = Depends(oauth2_scheme)):
     Функция для извлечения информации о пользователе из токена. Проверяем токен и извлекаем утверждение о пользователе.
     """
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, conf.SECRET_KEY, algorithms=[conf.ALGORITHM])
+        if payload.get("type") != "access":
+            raise InvalidTokenException()
         return payload.get("sub")
     except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Токен просрочен", headers={"WWW-Authenticate": "Bearer"}
-        )
+        raise ExpireTokenException()
     except jwt.InvalidTokenError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Не валидный токен", headers={"WWW-Authenticate": "Bearer"}
-        )
+        raise InvalidTokenException()
+
+
+def update_refresh_token(token: str) -> Tuple[str, str]:
+    try:
+        payload = jwt.decode(token, conf.SECRET_KEY, algorithms=[conf.ALGORITHM])
+        username = payload.get("sub")
+        if payload.get("type") != "refresh" or not refresh_tokens.get(username):
+            raise InvalidTokenException()
+        return create_jwt_tokens({"sub": username})
+    except jwt.ExpiredSignatureError:
+        raise ExpireTokenException()
+    except jwt.InvalidTokenError:
+        raise InvalidTokenException()

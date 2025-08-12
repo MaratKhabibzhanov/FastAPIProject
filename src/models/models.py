@@ -20,3 +20,5 @@ sample_products = [sample_product_1, sample_product_2, sample_product_3, sample_
 # Симуляция базы данных в виде списка объектов пользователей
 fake_users_db = [UserInDB(username="user1", hashed_password=bcrypt.hash("pass1"))]
 cookie_cache = dict()
+
+refresh_tokens = dict()

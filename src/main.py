@@ -1,50 +1,59 @@
 from datetime import datetime, timedelta
 from typing import Annotated
 
-from fastapi import Depends, Header, Request, Response
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import Depends, Header, Request, Response, status
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
 from src.models.models import cookie_cache
-from src.schemas import CommonHeaders, User
+from src.schemas import CommonHeaders, Refresh, User
 
-from .app import app
+from .app import app, limiter
 from .config import load_config as config
-from .security import create_jwt_token, get_user_from_token
+from .security import create_jwt_tokens, get_user_from_token, update_refresh_token
 from .utils import authenticate_user, create_new_user, get_user_from_db
 
 
-token_serializer = URLSafeTimedSerializer(secret_key=config().secret_key)
+token_serializer = URLSafeTimedSerializer(secret_key=config().SECRET_KEY)
 
 
 @app.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = User(username=form_data.username, password=form_data.password)
+@limiter.limit("5/minute")
+async def login(request: Request, data: User):
+    user = User(username=data.username, password=data.password)
     authenticated_user = authenticate_user(user)
-    token = create_jwt_token({"sub": authenticated_user.username})
-    return {"access_token": token, "token_type": "bearer"}
+    access_token, refresh_token = create_jwt_tokens({"sub": authenticated_user.username})
+    return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
+
+
+@app.post("/refresh")
+@limiter.limit("5/minute")
+async def refresh(request: Request, data: Refresh):
+    access_token, refresh_token = update_refresh_token(data.refresh_token)
+    return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
 
 
 @app.post("/register")
-def register(user: User):
+@limiter.limit("1/minute")
+async def register(user: User, request: Request, response: Response):
     create_new_user(user)
-    return {"message": f"Welcome, {user.username}!"}
+    response.status_code = status.HTTP_201_CREATED
+    return {"message": "New user created"}
 
 
 @app.get("/protected_resource")
-def protected_resource(current_user: str = Depends(get_user_from_token)):
+async def protected_resource(current_user: str = Depends(get_user_from_token)):
     """
     Этот маршрут защищен и требует токен. Если токен действителен, мы возвращаем информацию о пользователе.
     """
     user = get_user_from_db(current_user)
     if user:
-        return {"username": user.username}
+        return {"message": "Access granted"}
     # Если пользователь не найден, возвращаем ошибку
     return {"error": "User not found"}
 
 
 @app.get("/profile")
-def get_profile(request: Request, response: Response):
+async def get_profile(request: Request, response: Response):
     session_token = request.cookies.get("session_token")
     if not session_token:
         response.status_code = 401

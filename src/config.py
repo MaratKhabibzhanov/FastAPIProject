@@ -11,9 +11,12 @@ class DatabaseConfig:
 @dataclass
 class Config:
     db: DatabaseConfig
-    secret_key: str
+    SECRET_KEY: str
     debug: bool
+    ACCESS_TOKEN_EXPIRE_MINUTES: int
+    REFRESH_TOKEN_EXPIRE_MINUTES: int
     MINIMUM_APP_VERSION: str = "0.0.2"
+    ALGORITHM: str = "HS256"
 
 
 def load_config(path: str = None) -> Config:
@@ -22,6 +25,8 @@ def load_config(path: str = None) -> Config:
 
     return Config(
         db=DatabaseConfig(database_url=env("DATABASE_URL")),
-        secret_key=env("SECRET_KEY"),
+        SECRET_KEY=env("SECRET_KEY"),
         debug=env.bool("DEBUG", default=False),
+        ACCESS_TOKEN_EXPIRE_MINUTES=1,
+        REFRESH_TOKEN_EXPIRE_MINUTES=3,
     )
