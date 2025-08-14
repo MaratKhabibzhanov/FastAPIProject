@@ -5,9 +5,11 @@ import jwt
 from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 
-from .config import load_config as config
-from .exceptions import ExpireTokenException, InvalidTokenException
-from .models.models import refresh_tokens
+from src.config import load_config as config
+from src.db.database import refresh_tokens
+from src.models.models import UserInDB
+from src.security.exceptions import ExpireTokenException, InvalidTokenException
+from src.security.utils import get_user_from_db
 
 
 conf = config()
@@ -32,7 +34,7 @@ def create_jwt_tokens(data: Dict) -> Tuple[str, str]:
 
 
 # Функция для получения пользователя из токена
-def get_user_from_token(token: str = Depends(oauth2_scheme)):
+def get_user_from_token(token: str = Depends(oauth2_scheme)) -> UserInDB:
     """
     Функция для извлечения информации о пользователе из токена. Проверяем токен и извлекаем утверждение о пользователе.
     """
@@ -40,7 +42,7 @@ def get_user_from_token(token: str = Depends(oauth2_scheme)):
         payload = jwt.decode(token, conf.SECRET_KEY, algorithms=[conf.ALGORITHM])
         if payload.get("type") != "access":
             raise InvalidTokenException()
-        return payload.get("sub")
+        return get_user_from_db(payload.get("sub"))
     except jwt.ExpiredSignatureError:
         raise ExpireTokenException()
     except jwt.InvalidTokenError:

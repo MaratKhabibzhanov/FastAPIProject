@@ -27,6 +27,6 @@ def load_config(path: str = None) -> Config:
         db=DatabaseConfig(database_url=env("DATABASE_URL")),
         SECRET_KEY=env("SECRET_KEY"),
         debug=env.bool("DEBUG", default=False),
-        ACCESS_TOKEN_EXPIRE_MINUTES=1,
-        REFRESH_TOKEN_EXPIRE_MINUTES=3,
+        ACCESS_TOKEN_EXPIRE_MINUTES=15,
+        REFRESH_TOKEN_EXPIRE_MINUTES=7 * 24 * 60,
     )

@@ -3,8 +3,8 @@ from secrets import compare_digest
 from fastapi import HTTPException, status
 from passlib.hash import bcrypt
 
-from src.models.models import fake_users_db
-from src.schemas import User, UserInDB
+from src.db.database import fake_users_db
+from src.models.models import User, UserInDB
 
 
 def authenticate_user(user: User):
@@ -28,7 +28,7 @@ def get_user_from_db(username: str):
 
 
 def create_new_user(user: User):
-    new_user = UserInDB(username=user.username, hashed_password=bcrypt.hash(user.password))
+    new_user = UserInDB(username=user.username, hashed_password=bcrypt.hash(user.password), role=user.role)
     if get_user_from_db(new_user.username):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already exists")
     fake_users_db.append(new_user)
